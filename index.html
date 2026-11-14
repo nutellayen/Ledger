@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#14213d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ledger">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<script src="firebase-config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<title>Hustle Ledger</title>
+<style>
+:root{--bg:#eef2f7;--card:#fff;--ink:#14213d;--mute:#5b6b85;--line:#d9e0ea;--acc:#14213d;--paid:#1f8a5b;--paidbg:#e3f4ec;--pend:#b3261e;--pendbg:#fdeceb;--unp:#8a6200;--unpbg:#fff3d1;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1420;--card:#18212f;--ink:#e8edf5;--mute:#93a1b8;--line:#2a3548;--acc:#e8edf5;--paid:#5fd09a;--paidbg:#143226;--pend:#ff8a80;--pendbg:#3a1a1a;--unp:#f1c45a;--unpbg:#3a2f12}}
+:root[data-theme="dark"]{--bg:#0e1420;--card:#18212f;--ink:#e8edf5;--mute:#93a1b8;--line:#2a3548;--acc:#e8edf5;--paid:#5fd09a;--paidbg:#143226;--pend:#ff8a80;--pendbg:#3a1a1a;--unp:#f1c45a;--unpbg:#3a2f12}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:16px 14px 90px}
+.hd{display:flex;align-items:center;gap:10px;margin:6px 0 14px}
+h1{font:700 26px/1.1 Georgia,"Times New Roman",serif;margin:0}
+.chip{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--acc);color:var(--bg);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-weight:600}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.box small{color:var(--mute);display:block}
+.box b{font-size:18px;display:block;margin-top:2px}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:12px}
+.tabs button{flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 12px;border-radius:20px;font:inherit;font-size:14px;cursor:pointer}
+.tabs button.on{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+.banner{background:var(--unpbg);color:var(--unp);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px}
+.job{background:var(--card);border:1px solid var(--line);border-left:6px solid var(--unp);border-radius:12px;padding:12px;margin-bottom:10px}
+.job.Overdue{border-left-color:var(--pend);background:var(--pendbg)}
+.job.Paid{border-left-color:var(--paid)}
+.job.Void{border-left-color:var(--mute);opacity:.8}
+.job.Void .name{text-decoration:line-through}
+.top{display:flex;justify-content:space-between;gap:8px}
+.name{font-weight:650}
+.co{color:var(--mute);font-size:14px}
+.amt{text-align:right;font-weight:700;white-space:nowrap}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.tag{font-size:12.5px;padding:2px 8px;border-radius:10px;background:var(--bg);color:var(--mute)}
+.tag.Unpaid,.tag.Pending{background:var(--unpbg);color:var(--unp)}.tag.Overdue{background:var(--pend);color:#fff}.tag.Paid{background:var(--paidbg);color:var(--paid)}
+.tag.tax{background:var(--acc);color:var(--bg)}
+.note{font-size:13.5px;color:var(--mute);margin-bottom:8px;white-space:pre-wrap;word-break:break-word}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+button.b{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 12px;font:inherit;font-size:14px;cursor:pointer}
+button.b.go{background:var(--paid);border-color:var(--paid);color:#fff}
+button.b.danger{background:var(--pend);border-color:var(--pend);color:#fff}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--acc);color:var(--bg);border:0;border-radius:28px;padding:14px 20px;font:inherit;font-weight:650;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer}
+.empty{text-align:center;color:var(--mute);padding:30px 10px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.modal.open{display:flex}
+#dlg{z-index:40}
+#drawer{justify-content:flex-start;align-items:stretch}
+.side{background:var(--card);width:82%;max-width:320px;overflow:auto;padding:16px;padding-top:calc(16px + env(safe-area-inset-top,0px))}
+.side h2{margin:0 0 10px;font-size:19px}
+.side button{display:flex;justify-content:space-between;width:100%;text-align:left;border:0;background:none;color:var(--ink);font:inherit;padding:11px 8px;border-bottom:1px solid var(--line);cursor:pointer}
+.side button.on{font-weight:700;background:var(--bg)}
+.side i{font-style:normal;color:var(--mute)}.side i.r{color:var(--pend);font-weight:700}
+.sheet{background:var(--card);width:100%;max-width:640px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+.sheet h2{margin:0 0 10px;font-size:19px}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:block;font-size:13px;color:var(--mute)}
+label.full,.g.full{grid-column:1/-1}
+input,select,textarea{width:100%;margin-top:3px;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
+select#yr{width:auto;margin:6px 0}
+label.ck{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:15px}
+label.ck input{width:auto;margin:0}
+.calc{grid-column:1/-1;font-size:14px;color:var(--mute)}
+.row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.row .b{flex:1;padding:11px}
+.li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px;word-break:break-word}
+.sheet h3{margin:16px 0 6px;font-size:16px}
+select#ts{width:auto;margin:6px 0}
+.fab.l{right:auto;left:16px;background:var(--card);color:var(--ink);border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="hd"><button class="b" id="menu" aria-label="Companies">☰</button><h1>Hustle Ledger</h1><button class="b go" id="saveall" style="margin-left:auto">Save all</button></div>
+<div id="cochip"></div>
+<div class="sum" id="sum"></div>
+<div id="yrbar"></div>
+<div id="sync" class="note" style="padding:0 4px 6px;font-size:12px"></div>
+<div class="tabs" id="tabs"></div>
+<div id="banner"></div>
+<div id="list"></div>
+<div class="acts" id="xp" style="margin-top:18px"><button class="b" data-x="csv">Export CSV (Google Sheets)</button><button class="b" data-x="json">Save backup</button></div>
+</div>
+<button class="fab l" id="addx">+ Add expenses</button>
+<button class="fab" id="add">+ Add job</button>
+
+<div class="modal" id="drawer"><div class="side" id="side"></div></div>
+
+<div class="modal" id="modal"><div class="sheet">
+<h2 id="mt">Add job</h2>
+<div class="g">
+<label class="full">Job / task name<input id="name" placeholder="User interview"></label>
+<label>Company<select id="company"><option value="">Select</option></select></label>
+<label>Payout method<select id="method"><option>PayPal</option><option>Bank Transfer</option><option>Hyperwallet</option><option>Payoneer</option><option>Gift Card</option></select></label>
+<label>Job email<select id="mail"><option value="">Not set</option><option>oing.natalie@gmail.com</option><option>crescent.local1@gmail.com</option><option>kelvinkken@gmail.com</option><option>Crescent26cm@hotmail.com</option></select></label>
+<label id="bkw">Bank<select id="bank"><option value="">Not set</option><option>Monzo</option><option>Halifax</option><option>HSBC</option></select></label>
+<label id="ppw">PayPal account<select id="pp"><option value="">Not set</option><option>ausiko0730@gmail.com</option><option>oing.natalie@gmail.com</option></select></label>
+<label>Currency<select id="cur"><option>GBP</option><option>USD</option><option>HKD</option><option>EUR</option><option>CAD</option></select></label>
+<label>Amount<input id="gross" type="number" step="0.01" inputmode="decimal"></label>
+<label>Offer / start date<input id="start" type="date"></label>
+<label>Expected pay date<input id="exp" type="date"></label>
+<label>Status<select id="status"><option>Unpaid</option><option>Pending</option><option>Paid</option></select></label>
+<label>Date received (when paid)<input id="recv" type="date"></label>
+<div class="g full" id="gcw"><label>Gift card status<select id="gc"><option>Not Claimed</option><option>Claimed</option></select></label><label>Claimed date<input id="gcd" type="date"></label></div>
+<label class="ck full"><input type="checkbox" id="tax"> Taxable (needs Self Assessment)</label>
+<div class="calc" id="net"></div>
+<label>Label (your own)<input id="lb" list="lbl" placeholder="Chase, Tax, Call back"></label><label>Flag<select id="fg"><option value="">No flag</option><option value="red">Red</option><option value="amber">Amber</option><option value="green">Green</option><option value="blue">Blue</option><option value="purple">Purple</option></select></label><label class="full">Remind me on<input id="rm" type="date"></label><datalist id="lbl"></datalist>
+<label class="full">Notes / remarks<textarea id="notes" rows="6" placeholder="Paste emails, links, tax reminders…"></textarea></label>
+</div>
+<div class="row"><button class="b danger" id="mdel" style="display:none">Delete</button><button class="b" id="cancel">Cancel</button><button class="b go" id="save">Save</button></div>
+</div></div>
+
+<div class="modal" id="dlg"><div class="sheet"><h2 id="dt"></h2><div id="db"></div><div class="row" id="dbtn"></div></div></div>
+
+<script>
+var KEY='hustle-ledger-v1',jobs=[],tab='all',editId=null,yr='all',co='all',cl=[],ts='all',curTax=null;
+try{jobs=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){jobs=[]}
+var FB=null,AUTH=null,FS=null,UID=null,dbReady=false,dbT=null,lastJ={},lastM='',unsubJ=null,unsubM=null;
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(jobs))}catch(e){}dbQueue()}
+function dbQueue(){if(!dbReady)return;clearTimeout(dbT);dbT=setTimeout(dbSave,600)}
+function setSync(t,mode){var e=$('sync');if(e)e.innerHTML=esc(t)+(mode==='in'?' <button class="b go" id="signin">Sign in with Google</button>':mode==='out'?' <button class="b" id="signout">Sign out</button>':'')}
+function uref(){return FS.collection('users').doc(UID)}
+async function dbSave(){
+  dbT=null;if(!dbReady)return;
+  try{
+    var ops=[],pend={},cur={};
+    jobs.forEach(function(j){var s=JSON.stringify(j);cur[j.id]=1;if(lastJ[j.id]!==s){ops.push(['s',j.id,s]);pend[j.id]=s}});
+    Object.keys(lastJ).forEach(function(id){if(!cur[id]){ops.push(['d',id]);pend[id]=null}});
+    var th='';try{th=localStorage.getItem(TK)||''}catch(e){}
+    var m=JSON.stringify({ls:LS,th:th}),metaOp=m!==lastM;
+    setSync('Saving...');
+    for(var i=0;i<ops.length;i+=400){
+      var batch=FS.batch();
+      ops.slice(i,i+400).forEach(function(o){var r=uref().collection('jobs').doc(o[1]);if(o[0]==='s')batch.set(r,{d:o[2],t:Date.now()});else batch.delete(r)});
+      await batch.commit();
+    }
+    Object.keys(pend).forEach(function(id){if(pend[id]===null)delete lastJ[id];else lastJ[id]=pend[id]});
+    if(metaOp){await uref().collection('meta').doc('settings').set({ls:JSON.stringify(LS),th:th});lastM=m}
+    setSync('Saved to your account. '+(AUTH.currentUser.email||''),'out')
+  }catch(e){setSync('Could not save to your account ('+((e&&e.code)||'error')+'). Still saved on this device.','out')}
+}
+function listen(){
+  var firstJ=true;
+  if(unsubJ)unsubJ();if(unsubM)unsubM();
+  unsubJ=uref().collection('jobs').onSnapshot(function(snap){
+    var map={},changed=false;jobs.forEach(function(j){map[j.id]=j});
+    snap.docChanges().forEach(function(ch){
+      var id=ch.doc.id;
+      if(ch.type==='removed'){if(map[id]){delete map[id];changed=true}delete lastJ[id];return}
+      var s=ch.doc.data().d;if(lastJ[id]===s)return;
+      try{map[id]=JSON.parse(s);lastJ[id]=s;changed=true}catch(e){}
+    });
+    if(changed){var seen={},out=[];jobs.forEach(function(j){if(map[j.id]){out.push(map[j.id]);seen[j.id]=1}});Object.keys(map).forEach(function(id){if(!seen[id])out.push(map[id])});jobs=out;try{localStorage.setItem(KEY,JSON.stringify(jobs))}catch(e){}render()}
+    if(firstJ&&!snap.metadata.fromCache){firstJ=false;dbReady=true;dbSave()}
+    else if(firstJ&&snap.metadata.fromCache){dbReady=true;setSync('Synced with your account (offline copy)','out')}
+    else if(!snap.metadata.hasPendingWrites)setSync('Synced with your account. '+(AUTH.currentUser.email||''),'out')
+  },function(e){setSync('Sync problem ('+((e&&e.code)||'error')+'). Saved on this device.','out')});
+  unsubM=uref().collection('meta').doc('settings').onSnapshot(function(d){
+    if(d.metadata.hasPendingWrites||!d.exists)return;var x=d.data();
+    try{var ls=JSON.parse(x.ls),m=JSON.stringify({ls:ls,th:x.th||''});if(m===lastM)return;LS=ls;localStorage.setItem(LK,x.ls);lastM=m;if(x.th)applyTheme(x.th);render()}catch(e){}
+  });
+}
+function signIn(){var p=new firebase.auth.GoogleAuthProvider();AUTH.signInWithPopup(p).catch(function(e){if(e&&(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment'))AUTH.signInWithRedirect(p);else setSync('Sign-in problem: '+((e&&e.code)||'error'),'in')})}
+function dbInit(){
+  $('sync').onclick=function(e){if(e.target.id==='signin')signIn();if(e.target.id==='signout'&&AUTH)AUTH.signOut()};
+  if(!window.firebase||!window.FIREBASE_CONFIG||String(FIREBASE_CONFIG.apiKey||'').indexOf('PASTE')===0){setSync('Sync is not set up yet. Saved on this device only.');return}
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);AUTH=firebase.auth();FS=firebase.firestore();
+    FS.enablePersistence({synchronizeTabs:true}).catch(function(){});
+    AUTH.getRedirectResult().catch(function(e){setSync('Sign-in problem: '+((e&&e.code)||'error'),'in')});
+    AUTH.onAuthStateChanged(function(u){
+      if(unsubJ){unsubJ();unsubJ=null}if(unsubM){unsubM();unsubM=null}
+      if(!u){UID=null;dbReady=false;setSync('Saved on this device only.','in');return}
+      UID=u.uid;setSync('Connecting...');listen();
+    });
+  }catch(e){setSync('Saved on this device only.')}
+}
+var $=function(i){return document.getElementById(i)};
+function today(){var d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate())}
+function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function pd(s){if(!s)return null;var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2])}
+function due(j){if(j.exp)return pd(j.exp);var s=pd(j.start);if(!s||!j.term)return null;s.setDate(s.getDate()+(+j.term));return s}
+function eff(j){if(j.void)return 'Void';if(j.status==='Paid')return 'Paid';var d=due(j);if(d&&d<today())return 'Overdue';return j.status}
+function net(j){return +j.gross||0}
+function money(n,c){return c+' '+n.toFixed(2)}
+function fmt(d){return d?d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}):''}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function ty(j){var d=pd(j.recv)||pd(j.exp)||pd(j.start);if(!d)return '';var y=d.getFullYear();if(d<new Date(y,3,6))y--;return y+'-'+(y+1)}
+function find(id){return jobs.filter(function(j){return j.id===id})[0]}
+function tx(j){if(!j.tx)j.tx={st:'To report',sub:'',done:'',exp:[],docs:[]};return j.tx}
+function exTot(j){return tx(j).exp.reduce(function(a,x){return a+(+x.a||0)},0)}
+var cyf='all';
+function yearOf(j){return (j.recv||j.exp||j.start||'').slice(0,4)}
+function yrOK(j){return cyf==='all'||yearOf(j)===cyf}
+function mine(j){return (co==='all'||j.company===co)&&yrOK(j)}
+
+function dlg(t,body,btns){
+  $('dt').textContent=t;$('db').innerHTML=body;$('dbtn').innerHTML='';
+  btns.forEach(function(b){var e=document.createElement('button');e.className='b '+(b.c||'');e.textContent=b.l;
+    e.onclick=function(){if(b.f&&b.f()===false)return;$('dlg').classList.remove('open')};$('dbtn').appendChild(e)});
+  $('dlg').classList.add('open');
+}
+
+function render(){
+  $('yrbar').innerHTML='<select id="cyf" style="width:auto;margin:0 0 10px">'+['all','2024','2025','2026','2027'].map(function(y){return '<option value="'+y+'"'+(y===cyf?' selected':'')+'>'+(y==='all'?'All years':y)+'</option>'}).join('')+'</select>';
+  var L=jobs.filter(function(j){return !j.void&&mine(j)&&j.kind!=='expense'}),owed={},got={};
+  L.forEach(function(j){var m=eff(j)==='Paid'?got:owed;m[j.cur]=(m[j.cur]||0)+net(j)});
+  function lines(m){var k=Object.keys(m);return k.length?k.map(function(c){return money(m[c],c)}).join('<br>'):'Nothing'}
+  $('cochip').innerHTML=co==='all'?'':'<div class="chip">'+esc(co)+'<button class="b" id="clr">Show all</button></div>';
+  $('sum').innerHTML='<div class="box"><small>Still to receive</small><b>'+lines(owed)+'</b></div><div class="box"><small>Received</small><b>'+lines(got)+'</b></div>';
+  var over=L.filter(function(j){return eff(j)==='Overdue'}).length;
+  var taxN=L.filter(function(j){return j.tax}).length;
+  var gcN=L.filter(function(j){return j.method==='Gift Card'&&j.gc==='Not Claimed'}).length;
+  var stN=jobs.filter(function(j){return j.void&&mine(j)}).length;var EX=jobs.filter(function(j){return j.kind==='expense'&&yrOK(j)});var RM=jobs.filter(function(j){return !j.void&&(j.rm||j.fg)});
+  var defs=[['all','All ('+L.length+')'],['over','Overdue ('+over+')'],['tax','Tax ('+taxN+')'],['gift','Gift card vault ('+gcN+')'],['rem','Reminders ('+RM.length+')'],['exp','Expenses ('+EX.length+')'],['struck','Struck out ('+stN+')']];
+  $('tabs').innerHTML=defs.map(function(d){return '<button data-t="'+d[0]+'" class="'+(tab===d[0]?'on':'')+'">'+d[1]+'</button>'}).join('');
+  var f=tab==='struck'?jobs.filter(function(j){return j.void&&mine(j)}):L.slice();
+  if(tab==='exp')f=EX.slice();if(tab==='rem')f=RM.slice();
+  if(tab==='over')f=f.filter(function(j){return eff(j)==='Overdue'});
+  if(tab==='tax'){f=f.filter(function(j){return j.tax});if(yr!=='all')f=f.filter(function(j){return ty(j)===yr});if(ts!=='all')f=f.filter(function(j){return tx(j).st===ts})}
+  if(tab==='gift')f=f.filter(function(j){return j.method==='Gift Card'&&j.gc==='Not Claimed'});
+  var order={Overdue:0,Pending:1,Unpaid:2,Paid:3,Void:4};
+  f.sort(function(a,b){var d=order[eff(a)]-order[eff(b)];if(d)return d;var x=due(a),y=due(b);return (x?x.getTime():9e15)-(y?y.getTime():9e15)});
+  var b='';if(tab==='exp')f.sort(function(a,c){return (c.start||'')<(a.start||'')?-1:1});if(tab==='rem')f.sort(function(a,c){return (a.rm||'9999')<(c.rm||'9999')?-1:1});
+  if(tab==='tax'){var ys=[],inc={},exs={},pr={};var cy=today().getFullYear();if(today()<new Date(cy,3,6))cy--;['2024-2025','2025-2026','2026-2027','2027-2028'].forEach(function(s){if(ys.indexOf(s)<0)ys.push(s)});L.concat(EX).forEach(function(j){if(j.tax&&ty(j)&&ys.indexOf(ty(j))<0)ys.push(ty(j))});ys.sort();var unp={};
+    f.forEach(function(j){if(eff(j)==='Paid')inc[j.cur]=(inc[j.cur]||0)+net(j);else unp[j.cur]=(unp[j.cur]||0)+net(j);exs[j.cur]=(exs[j.cur]||0)+exTot(j)});EX.forEach(function(j){if(j.tax&&(yr==='all'||ty(j)===yr))exs[j.cur]=(exs[j.cur]||0)+net(j)});
+    Object.keys(inc).concat(Object.keys(exs)).forEach(function(c){pr[c]=(inc[c]||0)-(exs[c]||0)});
+    var toR=f.filter(function(j){return eff(j)==='Paid'&&tx(j).st==='To report'}).length;
+    b='Taxable jobs by UK tax year (6 Apr to 5 Apr).<br><select id="yr"><option value="all">All tax years</option>'+ys.map(function(y){return '<option'+(y===yr?' selected':'')+'>'+y+'</option>'}).join('')+'</select> <select id="ts">'+['all','To report','Submitted','Completed'].map(function(x){return '<option value="'+x+'"'+(x===ts?' selected':'')+'>'+(x==='all'?'All statuses':x)+'</option>'}).join('')+'</select><br><b>Income (paid):</b> '+lines(inc)+'<br><b>Unpaid taxable payments:</b> '+lines(unp)+'<br><b>Expenses:</b> '+lines(exs)+'<br><b>Profit:</b> '+lines(pr)+'<br>'+(toR?'<b>'+toR+' paid job'+(toR>1?'s':'')+' still to report.</b><br>':'')+'<a href="https://www.gov.uk/log-in-file-self-assessment-tax-return" target="_blank" rel="noopener">Open HMRC Self Assessment</a>'}
+  if(tab==='rem')b='Items with your own reminder date or flag. Overdue reminders show in red.';
+  if(tab==='exp'){var et={};EX.forEach(function(j){et[j.cur]=(et[j.cur]||0)+net(j)});b='Money you spent on the side hustle. Tax expenses are taken off your profit in the Tax tab.<br><b>Total spent:</b> '+lines(et)}
+  if(tab==='gift')b='Gift cards you still haven’t claimed or used.';
+  if(tab==='over')b='Past the expected pay date and not paid. Chase these.';
+  if(tab==='struck')b='Struck out jobs are kept on record with your reason and left out of totals.';
+  $('banner').innerHTML=b?'<div class="banner">'+b+'</div>':'';
+  $('list').innerHTML=f.length?f.map(card).join(''):'<div class="empty">'+(jobs.length?'Nothing here.':'No jobs yet. Tap “Add job” to log your first payment.')+'</div>';
+}
+function card(j){if(j.kind==='expense')return expCard(j);
+  var e=eff(j),d=due(j);
+  var h='<div class="job '+e+'"><div class="top"><div><div class="name">'+esc(j.name)+'</div><div class="co">'+esc(j.company)+' · '+esc(j.method)+'</div></div>';
+  h+='<div class="amt">'+money(net(j),j.cur)+'</div></div><div class="tags">';
+  if(e==='Overdue'){var n=Math.round((today()-d)/864e5);h+='<span class="tag Overdue">Overdue '+n+(n===1?' day':' days')+'</span>'}
+  else if(e!=='Void')h+='<span class="tag '+e+'">'+e+'</span>';
+  if(d&&e!=='Paid'&&e!=='Void')h+='<span class="tag">Expected '+fmt(d)+'</span>';
+  if(e==='Paid'&&j.recv)h+='<span class="tag">Received '+fmt(pd(j.recv))+'</span>';
+  if(j.bank)h+='<span class="tag">'+esc(j.bank)+'</span>';
+  if(j.pp)h+='<span class="tag">PayPal: '+esc(j.pp)+'</span>';
+  if(j.mail)h+='<span class="tag">Job email: '+esc(j.mail)+'</span>';
+  if(j.tax){var t=tx(j);h+='<span class="tag tax">Taxable '+ty(j)+'</span><span class="tag">Tax: '+t.st+(t.st!=='To report'&&(t.done||t.sub)?' '+fmt(pd(t.done||t.sub)):'')+'</span>';if(t.exp.length)h+='<span class="tag">Expenses '+money(exTot(j),j.cur)+'</span>';if(t.docs.length)h+='<span class="tag">'+t.docs.length+(t.docs.length>1?' docs':' doc')+'</span>'}
+  h+=flagTags(j);if(j.method==='Gift Card')h+='<span class="tag">Card: '+esc(j.gc)+(j.gc==='Claimed'&&j.gcd?' '+fmt(pd(j.gcd)):'')+'</span>';
+  h+='</div>';
+  if(j.void)h+='<div class="note"><b>Struck out '+fmt(pd(j.voidAt))+':</b> '+esc(j.voidWhy)+'</div>';
+  if(j.notes)h+='<div class="note">'+esc(j.notes)+'</div>';
+  h+='<div class="acts">';
+  if(j.void)h+='<button class="b" data-a="restore" data-id="'+j.id+'">Restore</button>';
+  else{
+    if(j.status!=='Paid')h+='<button class="b go" data-a="paid" data-id="'+j.id+'">Mark paid</button>';
+    else h+='<button class="b" data-a="unpaid" data-id="'+j.id+'">Mark unpaid</button>';
+    if(j.method==='Gift Card'&&j.gc==='Not Claimed')h+='<button class="b" data-a="claim" data-id="'+j.id+'">Mark claimed</button>';
+    if(j.tax)h+='<button class="b" data-a="tax" data-id="'+j.id+'">Tax details</button>';
+    h+='<button class="b" data-a="edit" data-id="'+j.id+'">Edit</button>';
+  }
+  h+='<button class="b" data-a="del" data-id="'+j.id+'">Delete</button></div></div>';
+  return h;
+}
+var FC={red:'#d93025',amber:'#e37400',green:'#1e8e3e',blue:'#1a73e8',purple:'#8e24aa'};
+function flagTags(j){var h='';
+  if(j.fg&&FC[j.fg])h+='<span class="tag" style="background:'+FC[j.fg]+';color:#fff">\u2691 '+(j.lb?esc(j.lb):esc(j.fg))+'</span>';
+  else if(j.lb)h+='<span class="tag" style="border:1px solid var(--mute)">\u{1F3F7} '+esc(j.lb)+'</span>';
+  if(j.rm){var d=pd(j.rm),od=!j.void&&d&&d<=today();h+='<span class="tag'+(od?' Overdue':'')+'">\u23F0 '+fmt(d)+(od?' due':'')+'</span>'}
+  return h}
+function labels(){var s=[];jobs.forEach(function(j){if(j.lb&&s.indexOf(j.lb)<0)s.push(j.lb)});return s}
+function expCard(j){
+  return '<div class="job"><div class="top"><div><div class="name">'+esc(j.name)+'</div><div class="co">Expense'+(j.shop?' · '+esc(j.shop):'')+'</div></div><div class="amt">'+money(net(j),j.cur)+'</div></div><div class="tags">'+(j.start?'<span class="tag">'+fmt(pd(j.start))+'</span>':'')+(j.tax?'<span class="tag tax">Tax expense '+ty(j)+'</span>':'<span class="tag">Not for tax</span>')+flagTags(j)+'</div>'+(j.notes?'<div class="note">'+esc(j.notes)+'</div>':'')+'<div class="acts"><button class="b" data-a="edit" data-id="'+j.id+'">Edit</button><button class="b" data-a="del" data-id="'+j.id+'">Delete</button></div></div>';
+}
+function openExp(j){
+  var cs=['GBP','USD','HKD','EUR','CAD'];
+  var h='<div class="g"><label class="full">What for<input id="x_n" placeholder="Phone bill share" value="'+esc(j?j.name:'')+'"></label><label>Amount<input id="x_a" type="number" step="0.01" inputmode="decimal" value="'+esc(j?j.gross:'')+'"></label><label>Currency<select id="x_c">'+cs.map(function(c){return '<option'+((j?j.cur:'GBP')===c?' selected':'')+'>'+c+'</option>'}).join('')+'</select></label><label>Date<input id="x_d" type="date" value="'+esc(j?j.start:iso(today()))+'"></label><label>Paid to<input id="x_s" placeholder="Shop or company" value="'+esc(j?j.shop:'')+'"></label><label>Label<input id="x_l" value="'+esc(j?j.lb:'')+'"></label><label>Flag<select id="x_f">'+['','red','amber','green','blue','purple'].map(function(c){return '<option value="'+c+'"'+((j?j.fg:'')===c?' selected':'')+'>'+(c||'No flag')+'</option>'}).join('')+'</select></label><label class="full">Remind me on<input id="x_r" type="date" value="'+esc(j?j.rm:'')+'"></label><label class="ck full"><input type="checkbox" id="x_t"'+(!j||j.tax?' checked':'')+'> Counts as a tax expense</label><label class="full">Notes<textarea id="x_o" rows="3">'+esc(j?j.notes:'')+'</textarea></label></div>';
+  dlg(j?'Edit expense':'Add expense',h,(j?[{l:'Delete',c:'danger',f:function(){jobs=jobs.filter(function(x){return x.id!==j.id});persist();render()}}]:[]).concat([{l:'Cancel'},{l:'Save',c:'go',f:function(){
+    var n=$('x_n').value.trim(),a=parseFloat($('x_a').value);if(!n||isNaN(a)){(n?$('x_a'):$('x_n')).focus();return false}
+    var e=j||{id:'x'+Date.now(),kind:'expense',status:'Paid',method:'Expense',company:'',mail:'',bank:'',pp:'',exp:'',gc:'N/A',gcd:''};
+    e.name=n;e.gross=String(a);e.cur=$('x_c').value;e.start=$('x_d').value;e.recv=e.start;e.shop=$('x_s').value.trim();e.notes=$('x_o').value;e.tax=$('x_t').checked;e.lb=$('x_l').value.trim();e.fg=$('x_f').value;e.rm=$('x_r').value;
+    if(!j)jobs.push(e);persist();tab='exp';render()}}]));
+}
+function askDate(title,label,fn){
+  dlg(title,'<label>'+label+'<input id="d1" type="date" value="'+iso(today())+'"></label>',[{l:'Cancel'},{l:'Save',c:'go',f:function(){var v=$('d1').value;if(!v)return false;fn(v);persist();render()}}]);
+}
+function askDelete(j){
+  var strike=!j.void;
+  dlg('Remove “'+j.name+'”?','<label>Reason (required)<textarea id="why" rows="3" placeholder="Why are you removing this?"></textarea></label><p class="note">'+(strike?'Strike out keeps it on record with your reason. ':'')+'Delete forever removes it completely.</p>',
+  [{l:'Cancel'}].concat(strike?[{l:'Strike out',f:function(){var w=$('why').value.trim();if(!w){$('why').focus();return false}j.void=true;j.voidWhy=w;j.voidAt=iso(today());persist();render()}}]:[]).concat([{l:'Delete forever',c:'danger',f:function(){var w=$('why').value.trim();if(!w){$('why').focus();return false}jobs=jobs.filter(function(x){return x.id!==j.id});persist();render()}}]));
+}
+$('list').onclick=function(e){
+  var a=e.target.getAttribute('data-a'),id=e.target.getAttribute('data-id');if(!a)return;
+  var j=find(id);if(!j)return;
+  if(a==='paid')askDate('Mark as paid','Date you received it',function(v){j.status='Paid';j.recv=v});
+  else if(a==='unpaid'){j.status='Unpaid';j.recv='';persist();render()}
+  else if(a==='claim')askDate('Mark gift card claimed','Date you claimed it',function(v){j.gc='Claimed';j.gcd=v});
+  else if(a==='restore'){delete j.void;persist();render()}
+  else if(a==='del'){if(j.kind==='expense')dlg('Delete expense?','<p>'+esc(j.name)+' · '+money(net(j),j.cur)+'</p>',[{l:'Cancel'},{l:'Delete forever',c:'danger',f:function(){jobs=jobs.filter(function(x){return x.id!==j.id});persist();render()}}]);else askDelete(j)}
+  else if(a==='edit'){if(j.kind==='expense')openExp(j);else openForm(j)}
+  else if(a==='tax')openTax(j);
+};
+$('tabs').onclick=function(e){var t=e.target.getAttribute('data-t');if(t){tab=t;render()}};
+$('banner').onchange=function(e){if(e.target.id==='yr'){yr=e.target.value;render()}if(e.target.id==='ts'){ts=e.target.value;render()}};
+$('cochip').onclick=function(e){if(e.target.id==='clr'){co='all';render()}};
+$('menu').onclick=function(){
+  var cnt={},ov={};jobs.forEach(function(j){if(j.void||!j.company)return;cnt[j.company]=(cnt[j.company]||0)+1;if(eff(j)==='Overdue')ov[j.company]=(ov[j.company]||0)+1});
+  cl=Object.keys(cnt).sort(function(a,b){return a.toLowerCase()<b.toLowerCase()?-1:1});
+  var all=jobs.filter(function(j){return !j.void&&j.kind!=='expense'}).length;
+  $('side').innerHTML='<h2>Companies</h2><button data-i="-1" class="'+(co==='all'?'on':'')+'">All companies <i>'+all+'</i></button>'+cl.map(function(c,i){return '<button data-i="'+i+'" class="'+(co===c?'on':'')+'">'+esc(c)+' <i'+(ov[c]?' class="r"':'')+'>'+(ov[c]?ov[c]+' overdue · ':'')+cnt[c]+'</i></button>'}).join('')+'<h2 style="margin-top:22px">Settings</h2><button data-x="theme">Colour scheme</button><button data-x="lists">Manage dropdown lists</button><h2 style="margin-top:22px">Backup</h2><button data-x="json">Save backup file</button><button data-x="csv">Export for Google Sheets (CSV)</button><button data-x="imp">Restore from backup file</button><input type="file" id="impf" accept=".json,application/json" style="display:none">';
+  $('drawer').classList.add('open');
+};
+$('side').onclick=function(e){var b=e.target.closest('button');if(!b)return;var x=b.getAttribute('data-x');if(x){backup(x);return}var i=+b.getAttribute('data-i');co=i<0?'all':cl[i];tab='all';$('drawer').classList.remove('open');render()};
+$('drawer').onclick=function(e){if(e.target.id==='drawer')$('drawer').classList.remove('open')};
+
+var F=['name','company','method','mail','bank','pp','cur','gross','start','exp','status','recv','gc','gcd','notes','lb','fg','rm'];
+var OTH=['company','method','cur','mail','bank','pp'];
+OTH.forEach(function(k){var s=$(k),o=document.createElement('option');o.value='__o';o.textContent='Other (type it)…';s.appendChild(o);var i=document.createElement('input');i.id=k+'_o';i.placeholder='Type it here';i.style.display='none';s.parentNode.appendChild(i);s.addEventListener('change',function(){i.style.display=s.value==='__o'?'block':'none';if(s.value==='__o')i.focus()})});
+var COS=['Angelfish','Askable','Beta testing','Clinicaluk (sequential.bio)','Dataforce TransPerfect','Give opinion/BEAM','Hotjar','Invisible/Wise','Kantar Survey','Lionbridge','MEL research','Mercor','MEU research','Monisa Enterprise','OneForma/Centrifuge','ONS research','Outlier/Scale Labs','Peopleforresearch','Playtest','Polilingual','RentAFriend','Research Garden','Research opinion','Respondent','Saro research','Swift research','Telus','Testbird','TesterWork','Tryber','User interview','Utest (Applause)','Vinted','VIP people','Zest/Kokoro'];
+var LK='hustle-lists',LS={},lk='company';
+try{LS=JSON.parse(localStorage.getItem(LK)||'{}')}catch(e){LS={}}
+function saveLS(){try{localStorage.setItem(LK,JSON.stringify(LS))}catch(e){}dbQueue()}
+function fillOth(){OTH.forEach(function(k){var s=$(k);
+  if(!LS[k])LS[k]=k==='company'?COS.slice():[].map.call(s.options,function(x){return x.value}).filter(function(v){return v&&v!=='__o'});
+  var cur=LS[k].slice();jobs.forEach(function(j){if(j[k]&&cur.indexOf(j[k])<0)cur.push(j[k])});
+  s.innerHTML=(k==='method'||k==='cur'?'':'<option value="">'+(k==='company'?'Select':'Not set')+'</option>')+cur.map(function(o){return '<option>'+esc(o)+'</option>'}).join('')+'<option value="__o">Other (type it)\u2026</option>';
+  $(k+'_o').style.display='none';$(k+'_o').value=''})}
+var NAMES={company:'Companies',method:'Payout methods',cur:'Currencies',mail:'Job emails',bank:'Banks',pp:'PayPal accounts'};
+function openLists(){fillOth();
+  var h='<label>List<select id="l_k">'+Object.keys(NAMES).map(function(k){return '<option value="'+k+'"'+(k===lk?' selected':'')+'>'+NAMES[k]+'</option>'}).join('')+'</select></label><div style="margin-top:8px">';
+  h+=LS[lk].map(function(o,i){return '<div class="li"><span>'+esc(o)+'</span><button class="b" data-ls="del" data-i="'+i+'">Remove</button></div>'}).join('')||'<div class="note">Empty.</div>';
+  h+='</div><label style="margin-top:10px">Add new<input id="l_new" placeholder="Type a name"></label><button class="b" data-ls="add" style="margin-top:6px">Add</button><p class="note">Removing an item hides it for new jobs. Jobs already using it keep it.</p>';
+  dlg('Manage lists',h,[{l:'Done',c:'go'}]);
+}
+$('db').addEventListener('click',function(e){
+  var a=e.target.getAttribute('data-ls');if(!a)return;
+  if(a==='del')LS[lk].splice(+e.target.getAttribute('data-i'),1);
+  else{var v=$('l_new').value.trim();if(!v)return;if(LS[lk].indexOf(v)<0)LS[lk].push(v)}
+  saveLS();openLists();
+});
+$('db').addEventListener('change',function(e){if(e.target.id==='l_k'){lk=e.target.value;openLists()}});
+function fillCos(){}
+function calc(){
+  fillCos();var j={start:$('start').value,exp:$('exp').value,recv:$('recv').value};
+  $('net').textContent=ty(j)?'UK tax year: '+ty(j):'';
+  $('gcw').style.display=$('method').value==='Gift Card'?'grid':'none';
+  $('bkw').style.display=$('method').value==='Bank Transfer'?'block':'none';
+  $('ppw').style.display=$('method').value==='PayPal'?'block':'none';
+}
+function openForm(j){
+  editId=j?j.id:null;$('mt').textContent=j?'Edit job':'Add job';$('mdel').style.display=j?'':'none';
+  fillOth();F.forEach(function(k){$(k).value=j?(j[k]==null?'':j[k]):''});
+  if(!j){$('method').value='PayPal';$('cur').value='GBP';$('status').value='Unpaid';$('gc').value='Not Claimed';$('start').value=iso(today());if(co!=='all')$('company').value=co}
+  $('tax').checked=j?!!j.tax:false;
+  $('lbl').innerHTML=labels().map(function(l){return '<option value="'+esc(l)+'">'}).join('');calc();$('modal').classList.add('open');
+}
+$('add').onclick=function(){openForm(null)};
+$('addx').onclick=function(){openExp(null)};
+$('cancel').onclick=function(){$('modal').classList.remove('open')};
+['start','exp','recv','method'].forEach(function(k){$(k).oninput=calc;$(k).onchange=calc});
+$('save').onclick=function(){
+  if(!$('name').value.trim()){dlg('Job name needed','Add a job name before saving.',[{l:'OK'}]);return}
+  for(var q=0;q<OTH.length;q++){if($(OTH[q]).value==='__o'&&!$(OTH[q]+'_o').value.trim()){dlg('Type your option','You picked “Other” but didn’t type anything.',[{l:'OK'}]);return}}
+  var j=editId?find(editId):{id:'j'+Date.now()};
+  F.forEach(function(k){j[k]=$(k).value});OTH.forEach(function(k){if(j[k]==='__o')j[k]=$(k+'_o').value.trim()});
+  j.tax=$('tax').checked;
+  if(j.method!=='Gift Card'){j.gc='N/A';j.gcd=''}else if(j.gc==='Claimed'&&!j.gcd)j.gcd=iso(today());
+  if(j.method!=='Bank Transfer')j.bank='';if(j.method!=='PayPal')j.pp='';
+  if(j.status==='Paid'&&!j.recv)j.recv=iso(today());
+  if(!editId)jobs.push(j);
+  persist();$('modal').classList.remove('open');render();
+};
+async function saveFile(name,text){var d=null;try{if(window.claude)d=await claude.use('downloads')}catch(e){}
+  if(d){try{await d.save({filename:name,data:text});return}catch(e){if(e&&e.code==='declined')return}}
+  try{var bb=new Blob([text],{type:'application/json'});var aa=document.createElement('a');aa.href=URL.createObjectURL(bb);aa.download=name;document.body.appendChild(aa);aa.click();aa.remove();setTimeout(function(){URL.revokeObjectURL(aa.href)},4000);return}catch(e){}
+  dlg('Copy this text','<textarea id="cp" rows="8" readonly></textarea><p class="note">Select all, copy, then paste it into a note or an email to yourself.</p>',[{l:'Close'}]);$('cp').value=text;
+}
+function backup(x){
+  if(x==='lists'){openLists();return}if(x==='theme'){openTheme();return}
+  if(x==='imp'){$('impf').click();return}
+  var st=iso(today());
+  if(x==='json'){saveFile('hustle-backup-'+st+'.json',JSON.stringify(jobs));return}
+  var H=['Job','Company','Payout method','Bank','PayPal account','Job email','Currency','Amount','Start date','Expected pay date','Status','Date received','Gift card','Gift card date','Taxable','Tax year','Tax status','Date submitted','Date completed','Expenses total','Notes','Struck out reason'];
+  var R=jobs.map(function(j){return [j.name,j.company,j.method,j.bank,j.pp,j.mail,j.cur,j.gross,j.start,j.exp,eff(j),j.recv,j.gc,j.gcd,j.tax?'Yes':'No',j.tax?ty(j):'',j.tax?tx(j).st:'',j.tax?tx(j).sub:'',j.tax?tx(j).done:'',j.tax?exTot(j):'',j.notes,j.void?j.voidWhy:'']});
+  var csv=[H].concat(R).map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"'}).join(',')}).join('\r\n');
+  saveFile('hustle-jobs-'+st+'.csv',csv);
+}
+$('xp').onclick=function(e){var x=e.target.getAttribute('data-x');if(x)backup(x)};
+$('side').onchange=function(e){
+  if(e.target.id!=='impf')return;var f=e.target.files[0];if(!f)return;var r=new FileReader();
+  r.onload=function(){try{var a=JSON.parse(r.result);if(!Array.isArray(a))throw 0;
+    dlg('Load file?','The file has '+a.length+' jobs. You have '+jobs.length+' on this device.',[{l:'Cancel'},{l:'Add to my jobs',c:'go',f:function(){var have={};jobs.forEach(function(x){have[x.id]=1});a.forEach(function(x){if(have[x.id])x.id=x.id+'_'+Date.now();jobs.push(x)});persist();co='all';$('drawer').classList.remove('open');render()}},{l:'Replace all',c:'danger',f:function(){jobs=a;persist();co='all';$('drawer').classList.remove('open');render()}}])}
+  catch(x){dlg('Can’t read file','That doesn’t look like a Hustle Ledger backup.',[{l:'OK'}])}};
+  r.readAsText(f);e.target.value='';
+};
+function grabTax(){var j=find(curTax);if(j&&$('t_st')){var t=tx(j);t.st=$('t_st').value;t.sub=$('t_sub').value;t.done=$('t_done').value}return j}
+function openTax(j){
+  curTax=j.id;var t=tx(j);
+  var h='<div class="note">'+esc(j.name)+' · '+money(net(j),j.cur)+' · tax year '+ty(j)+'</div><div class="g"><label class="full">Self Assessment status<select id="t_st">'+['To report','Submitted','Completed'].map(function(x){return '<option'+(t.st===x?' selected':'')+'>'+x+'</option>'}).join('')+'</select></label><label>Date submitted<input id="t_sub" type="date" value="'+esc(t.sub)+'"></label><label>Date completed (tax paid)<input id="t_done" type="date" value="'+esc(t.done)+'"></label></div>';
+  h+='<h3>Expenses</h3>'+(t.exp.map(function(x,i){return '<div class="li"><span>'+esc(x.d)+' · '+money(+x.a,j.cur)+'</span><button class="b" data-tx="delx" data-i="'+i+'">Remove</button></div>'}).join('')||'<div class="note">None yet.</div>');
+  h+='<div class="g" style="margin-top:8px"><label>What for<input id="t_xd" placeholder="Phone bill share"></label><label>Amount ('+esc(j.cur)+')<input id="t_xa" type="number" step="0.01" inputmode="decimal"></label></div><button class="b" data-tx="addx" style="margin-top:6px">Add expense</button><div class="note" style="margin-top:8px"><b>Expenses '+money(exTot(j),j.cur)+' · Profit '+money(net(j)-exTot(j),j.cur)+'</b></div>';
+  h+='<h3>Documents and links</h3>'+(t.docs.map(function(x,i){return '<div class="li"><a href="'+esc(x.u)+'" target="_blank" rel="noopener">'+esc(x.l)+'</a><button class="b" data-tx="dell" data-i="'+i+'">Remove</button></div>'}).join('')||'<div class="note">None yet.</div>');
+  h+='<div class="g" style="margin-top:8px"><label>Label<input id="t_ll" placeholder="Receipt, SA page"></label><label>Link<input id="t_lu" placeholder="https://"></label></div><div class="acts" style="margin-top:6px"><button class="b" data-tx="addl">Add link</button><button class="b" data-tx="up">Upload file</button></div><input type="file" id="t_f" style="display:none">';
+  dlg('Tax details',h,[{l:'Save and close',c:'go',f:function(){grabTax();persist();render()}}]);
+}
+$('db').onclick=function(e){
+  var a=e.target.getAttribute('data-tx');if(!a)return;var j=grabTax();if(!j)return;var t=tx(j),i=+e.target.getAttribute('data-i');
+  if(a==='delx')t.exp.splice(i,1);
+  else if(a==='dell')t.docs.splice(i,1);
+  else if(a==='addx'){var d=$('t_xd').value.trim(),m=parseFloat($('t_xa').value);if(!d||isNaN(m))return;t.exp.push({d:d,a:m})}
+  else if(a==='addl'){var l=$('t_ll').value.trim(),u=$('t_lu').value.trim();if(!u)return;if(!/^https?:\/\//i.test(u))u='https://'+u;t.docs.push({l:l||u,u:u})}
+  else if(a==='up'){$('t_f').click();return}
+  persist();render();openTax(j);
+};
+$('db').onchange=async function(e){
+  if(e.target.id!=='t_f')return;var f=e.target.files[0];if(!f)return;var j=grabTax();
+  try{var as=await claude.use('assets');if(!as)throw 0;var r=await as.upload(f);tx(j).docs.push({l:f.name,u:r.url});persist();render();openTax(j)}
+  catch(x){dlg('Upload not available','Files can’t be uploaded here. Save the file in Google Drive and add its link instead.',[{l:'OK'}])}
+};
+var TK='hustle-theme';
+function LT(bg,ink,mute,line,acc){return {'--bg':bg,'--card':'#ffffff','--ink':ink,'--mute':mute,'--line':line,'--acc':acc,'--paid':'#1f8a5b','--paidbg':'#e3f4ec','--pend':'#b3261e','--pendbg':'#fdeceb','--unp':'#8a6200','--unpbg':'#fff3d1'}}
+function DK(bg,card,ink,mute,line,acc){return {'--bg':bg,'--card':card,'--ink':ink,'--mute':mute,'--line':line,'--acc':acc,'--paid':'#5fd09a','--paidbg':'#143226','--pend':'#ff8a80','--pendbg':'#3a1a1a','--unp':'#f1c45a','--unpbg':'#3a2f12'}}
+var THEMES={'Default (follows phone)':null,'Ocean':LT('#e6f2f8','#0b2a3d','#4a6a7c','#c4dbe8','#0b6e99'),'Forest':LT('#eaf3ec','#1b3326','#5a7566','#cfe0d4','#2e7d4f'),'Sunset':LT('#fbeee6','#3d1f14','#8a6454','#ecd3c5','#d9531e'),'Berry':LT('#f6e9f1','#3a1230','#84607a','#e4cadb','#9c2a6e'),'Midnight':DK('#0b1220','#15203a','#e6edff','#8fa3c8','#26365c','#6ea8ff'),'Charcoal':DK('#121212','#1e1e1e','#eeeeee','#a0a0a0','#333333','#f1c45a')};
+function applyTheme(n){var r=document.documentElement.style;Object.keys(THEMES).forEach(function(k){var t=THEMES[k];if(t)Object.keys(t).forEach(function(v){r.removeProperty(v)})});var t=THEMES[n];if(t)Object.keys(t).forEach(function(v){r.setProperty(v,t[v])});try{localStorage.setItem(TK,n)}catch(e){}dbQueue()}
+function openTheme(){var h='<div class="note">Pick a colour scheme.</div><div class="g">'+Object.keys(THEMES).map(function(n){var t=THEMES[n]||LT('#eef2f7','#14213d','#5b6b85','#d9e0ea','#14213d');return '<button class="b" data-th="'+esc(n)+'" style="background:'+t['--bg']+';color:'+t['--ink']+';border:3px solid '+t['--acc']+';padding:14px 8px">'+esc(n)+'</button>'}).join('')+'</div>';dlg('Colour scheme',h,[{l:'Done',c:'go'}])}
+$('db').addEventListener('click',function(e){var n=e.target.getAttribute('data-th');if(n)applyTheme(n)});
+try{var st0=localStorage.getItem(TK);if(st0)applyTheme(st0)}catch(e){}
+function toast(t){var d=document.createElement('div');d.textContent=t;d.style.cssText='position:fixed;left:50%;top:calc(16px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--acc);color:var(--bg);padding:10px 16px;border-radius:20px;font-weight:600;z-index:60';document.body.appendChild(d);setTimeout(function(){d.remove()},2200)}
+function saveAll(){persist();saveLS();clearTimeout(dbT);dbSave().then(function(){toast(dbReady?'Saved to your account':'Saved on this device')});backup('json')}
+$('mdel').onclick=function(){var j=editId&&find(editId);if(!j)return;$('modal').classList.remove('open');askDelete(j)};
+$('yrbar').onchange=function(e){if(e.target.id==='cyf'){cyf=e.target.value;render()}};
+$('saveall').onclick=saveAll;
+render();
+dbInit();
+if('serviceWorker' in navigator)window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})});
+</script>
+</body>
+</html>
