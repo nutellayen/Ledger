@@ -1,4 +1,4 @@
-var C='ledger-v2';
+var C='ledger-v3';
 var A=['./','index.html','manifest.webmanifest','firebase-config.js','icon-192.png','icon-512.png'];
 self.addEventListener('install',function(e){e.waitUntil(caches.open(C).then(function(c){return c.addAll(A)}).then(function(){return self.skipWaiting()}))});
 self.addEventListener('activate',function(e){e.waitUntil(caches.keys().then(function(k){return Promise.all(k.filter(function(x){return x!==C}).map(function(x){return caches.delete(x)}))}).then(function(){return self.clients.claim()}))});

@@ -88,10 +88,12 @@ select#ts{width:auto;margin:6px 0}
 <div class="sum" id="sum"></div>
 <div id="yrbar"></div>
 <div id="sync" class="note" style="padding:0 4px 6px;font-size:12px"></div>
+<input id="q" type="search" placeholder="Search jobs, companies, notes" style="width:100%;margin:0 0 10px">
 <div class="tabs" id="tabs"></div>
 <div id="banner"></div>
 <div id="list"></div>
-<div class="acts" id="xp" style="margin-top:18px"><button class="b" data-x="csv">Export CSV (Google Sheets)</button><button class="b" data-x="json">Save backup</button></div>
+<input type="file" id="xlf" accept=".xlsx,.xls,.csv" hidden>
+<div class="acts" id="xp" style="margin-top:18px"><button class="b" data-x="csv">Export CSV</button><button class="b" data-x="xlsx">Export Excel</button><button class="b" data-x="imx">Import Excel / CSV</button><button class="b" data-x="json">Save backup</button></div>
 </div>
 <button class="fab l" id="addx">+ Add expenses</button>
 <button class="fab" id="add">+ Add job</button>
@@ -226,7 +228,7 @@ function render(){
   var taxN=L.filter(function(j){return j.tax}).length;
   var gcN=L.filter(function(j){return j.method==='Gift Card'&&j.gc==='Not Claimed'}).length;
   var stN=jobs.filter(function(j){return j.void&&mine(j)}).length;var EX=jobs.filter(function(j){return j.kind==='expense'&&yrOK(j)});var RM=jobs.filter(function(j){return !j.void&&j.kind!=='expense'&&!isDone(j)&&(j.rm||j.fg)||(j.kind==='expense'&&(j.rm||j.fg))});
-  var defs=[['all','All ('+LA.length+')'],['done','Completed ('+DN.length+')'],['over','Overdue ('+over+')'],['tax','Tax ('+taxN+')'],['gift','Gift card vault ('+gcN+')'],['rem','Reminders ('+RM.length+')'],['exp','Expenses ('+EX.length+')'],['struck','Struck out ('+stN+')']];
+  var defs=[['all','All ('+LA.length+')'],['done','Completed ('+DN.length+')'],['over','Overdue ('+over+')'],['tax','Tax ('+taxN+')'],['gift','Gift card vault ('+gcN+')'],['rem','Reminders ('+RM.length+')'],['exp','Expenses ('+EX.length+')'],['chart','Chart'],['struck','Struck out ('+stN+')']];
   $('tabs').innerHTML=defs.map(function(d){return '<button data-t="'+d[0]+'" class="'+(tab===d[0]?'on':'')+'">'+d[1]+'</button>'}).join('');
   var f=tab==='struck'?jobs.filter(function(j){return j.void&&mine(j)}):(tab==='done'?DN.slice():(tab==='all'||tab==='over')?LA.slice():L.slice());
   if(tab==='exp')f=EX.slice();if(tab==='rem')f=RM.slice();
@@ -247,6 +249,12 @@ function render(){
   if(tab==='gift')b='Gift cards you still haven’t claimed or used.';
   if(tab==='over')b='Past the expected pay date and not paid. Chase these.';
   if(tab==='struck')b='Struck out jobs are kept on record with your reason and left out of totals.';
+  if(tab==='chart'){$('banner').innerHTML='';$('list').innerHTML=chartHTML();return}
+  if(qs){var qw=qs.toLowerCase().split(/\s+/).filter(Boolean);
+    f=jobs.filter(function(j){var h=[j.name,j.company,j.notes,j.lb,j.fg,j.method,j.cur,j.gross,j.start,j.exp,j.recv,j.pp,j.mail,j.bank,j.shop,j.status,isDone(j)?'completed':'',j.void?'struck out':'',j.kind==='expense'?'expense':''].join(' ').toLowerCase();return qw.every(function(w){return h.indexOf(w)>=0})});
+    f.sort(function(x,y){return (y.recv||y.start||'')<(x.recv||x.start||'')?-1:1});
+    var sp={},su={};f.forEach(function(j){if(j.void||j.kind==='expense')return;var m=eff(j)==='Paid'?sp:su;m[j.cur]=(m[j.cur]||0)+net(j)});
+    b='<b>'+f.length+' result'+(f.length===1?'':'s')+'</b> for “'+esc(qs)+'” across all records (every tab, completed and struck out too).<br><b>Received:</b> '+lines(sp)+'<br><b>Not paid yet:</b> '+lines(su)}
   $('banner').innerHTML=b?'<div class="banner">'+b+'</div>':'';
   $('list').innerHTML=f.length?f.map(card).join(''):'<div class="empty">'+(jobs.length?'Nothing here.':'No jobs yet. Tap “Add job” to log your first payment.')+'</div>';
 }
@@ -392,16 +400,68 @@ $('save').onclick=function(){
 };
 async function saveFile(name,text){var d=null;try{if(window.claude)d=await claude.use('downloads')}catch(e){}
   if(d){try{await d.save({filename:name,data:text});return}catch(e){if(e&&e.code==='declined')return}}
-  try{var bb=new Blob([text],{type:'application/json'});var aa=document.createElement('a');aa.href=URL.createObjectURL(bb);aa.download=name;document.body.appendChild(aa);aa.click();aa.remove();setTimeout(function(){URL.revokeObjectURL(aa.href)},4000);return}catch(e){}
+  try{var isc=/\.csv$/i.test(name);var bb=new Blob([isc?'\ufeff'+text:text],{type:isc?'text/csv;charset=utf-8':'application/json'});var aa=document.createElement('a');aa.href=URL.createObjectURL(bb);aa.download=name;document.body.appendChild(aa);aa.click();aa.remove();setTimeout(function(){URL.revokeObjectURL(aa.href)},4000);return}catch(e){}
   dlg('Copy this text','<textarea id="cp" rows="8" readonly></textarea><p class="note">Select all, copy, then paste it into a note or an email to yourself.</p>',[{l:'Close'}]);$('cp').value=text;
 }
+var cyr=null,ccur=null,qs='';
+function curTY(){var d=today(),y=d.getFullYear();if(d<new Date(y,3,6))y--;return y+'-'+(y+1)}
+function chartHTML(){
+  if(!cyr)cyr=curTY();
+  var J=jobs.filter(function(j){return !j.void&&j.kind!=='expense'});
+  var yrs=['2024-2025','2025-2026','2026-2027','2027-2028'];J.forEach(function(j){var t=ty(j);if(t&&yrs.indexOf(t)<0)yrs.push(t)});yrs.sort();
+  var cs=[];J.forEach(function(j){if(j.cur&&cs.indexOf(j.cur)<0)cs.push(j.cur)});
+  if(!ccur||cs.indexOf(ccur)<0)ccur=cs.indexOf('GBP')>=0?'GBP':(cs[0]||'GBP');
+  var inY=function(j){return cyr==='all'||ty(j)===cyr};
+  var sel=J.filter(function(j){return j.cur===ccur&&inY(j)});
+  var by={},tp=0,tu=0,mo=[0,0,0,0,0,0,0,0,0,0,0,0];
+  sel.forEach(function(j){var c=j.company||'Other',o=by[c]||(by[c]={p:0,u:0});if(eff(j)==='Paid'){o.p+=net(j);tp+=net(j);var d=pd(j.recv);if(d)mo[(d.getMonth()+9)%12]+=net(j)}else{o.u+=net(j);tu+=net(j)}});
+  var rows=Object.keys(by).map(function(c){return {c:c,p:by[c].p,u:by[c].u}}).sort(function(a,b){return (b.p+b.u)-(a.p+a.u)});
+  var mx=rows.length?(rows[0].p+rows[0].u)||1:1;
+  var ex=0;jobs.forEach(function(j){if(j.void||j.cur!==ccur||!inY(j))return;if(j.kind==='expense'){if(j.tax)ex+=net(j)}else if(j.tax)ex+=exTot(j)});
+  var opt=function(v,t,cur){return '<option value="'+esc(v)+'"'+(v===cur?' selected':'')+'>'+esc(t)+'</option>'};
+  var h='<div class="g" style="margin-bottom:10px"><label>Financial year<select id="cyr">'+opt('all','All years',cyr)+yrs.map(function(y){return opt(y,y,cyr)}).join('')+'</select></label><label>Currency<select id="ccur">'+cs.map(function(c){return opt(c,c,ccur)}).join('')+'</select></label></div>';
+  h+='<div class="banner"><b>Received:</b> '+money(tp,ccur)+'<br><b>Still to receive:</b> '+money(tu,ccur)+'<br><b>Tax expenses:</b> '+money(ex,ccur)+'<br><b>Profit (received minus tax expenses):</b> '+money(tp-ex,ccur)+'</div>';
+  h+='<div style="margin:12px 0 2px;font-weight:600">By company</div><div class="note">Green is received. Amber is still to come.</div>';
+  h+=rows.length?rows.map(function(r){return '<div style="margin:8px 0"><div style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><span>'+esc(r.c)+'</span><span>'+money(r.p+r.u,ccur)+'</span></div><div style="display:flex;height:12px;background:var(--line);border-radius:6px;overflow:hidden"><span style="width:'+(r.p/mx*100)+'%;background:var(--paid)"></span><span style="width:'+(r.u/mx*100)+'%;background:#e0a100"></span></div></div>'}).join(''):'<div class="empty">Nothing in this year and currency.</div>';
+  if(cyr!=='all'){var M=['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'],mm=Math.max.apply(null,mo)||1;
+    h+='<div style="margin:16px 0 4px;font-weight:600">Received each month</div>'+M.map(function(m,i){return '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:13px"><span style="width:30px">'+m+'</span><span style="flex:1;background:var(--line);border-radius:6px;height:10px;overflow:hidden"><span style="display:block;height:10px;width:'+(mo[i]/mm*100)+'%;background:var(--paid)"></span></span><span style="width:84px;text-align:right">'+(mo[i]?money(mo[i],ccur):'')+'</span></div>'}).join('')}
+  return h}
+function loadXLSX(){return new Promise(function(res,rej){if(window.XLSX)return res();var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';s.onload=res;s.onerror=function(){rej(new Error('offline'))};document.head.appendChild(s)})}
+function saveBlob(name,blob){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},4000)}
+async function exportXlsx(H,R,st){
+  try{await loadXLSX();var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([H].concat(R)),'Jobs');
+    var out=XLSX.write(wb,{bookType:'xlsx',type:'array'});saveBlob('hustle-jobs-'+st+'.xlsx',new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}))}
+  catch(e){dlg('Can’t make Excel file','You need to be online for this. You can use Export CSV instead, and Excel opens that too.',[{l:'OK'}])}}
+function toIso(v){v=String(v==null?'':v).trim();if(!v)return '';var m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  m=v.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);if(m){var y=+m[3];if(y<100)y+=2000;return y+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2)}
+  var d=new Date(v);return isNaN(d)?'':d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+function rowToJob(r,i){
+  var g={};Object.keys(r).forEach(function(k){g[k.toLowerCase().replace(/[^a-z]/g,'')]=r[k]});
+  var pick=function(){for(var i=0;i<arguments.length;i++){var v=g[arguments[i]];if(v!==undefined&&String(v).trim()!=='')return String(v).trim()}return ''};
+  var name=pick('job','name','jobname','task');if(!name)return null;
+  var amt=parseFloat(pick('amount','gross','value').replace(/[^0-9.\-]/g,''));
+  var st=pick('status').toLowerCase();st=st==='paid'?'Paid':st==='pending'?'Pending':'Unpaid';
+  var gc=pick('giftcard','gc');gc=/^claimed/i.test(gc)?'Claimed':/not/i.test(gc)?'Not Claimed':'N/A';
+  var cur=pick('currency','cur').toUpperCase().slice(0,3)||'GBP';
+  var tax=/^(yes|y|true|1)$/i.test(pick('taxable','tax'));
+  return {id:'x'+Date.now().toString(36)+i,name:name,company:pick('company'),method:pick('payoutmethod','method')||'PayPal',bank:pick('bank'),pp:pick('paypalaccount','pp'),mail:pick('jobemail','email','mail'),cur:cur,gross:isNaN(amt)?'0':String(amt),start:toIso(pick('startdate','start','date')),exp:toIso(pick('expectedpaydate','expected','exp')),status:st,recv:toIso(pick('datereceived','received','recv')),gc:gc,gcd:toIso(pick('giftcarddate','gcd')),notes:pick('notes','remarks'),tax:tax,lb:pick('label'),fg:pick('flag').toLowerCase(),rm:toIso(pick('remind','reminder'))}}
+async function importSheet(f){
+  try{await loadXLSX();var buf=await f.arrayBuffer();var wb=XLSX.read(buf,{type:'array'});var ws=wb.Sheets[wb.SheetNames[0]];
+    var rows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});var out=[];rows.forEach(function(r,i){var j=rowToJob(r,i);if(j)out.push(j)});
+    if(!out.length){dlg('Nothing to import','I couldn’t find a “Job” column with names in it. Use the same column headings as Export CSV.',[{l:'OK'}]);return}
+    dlg('Import '+out.length+' rows?','<p>Found '+out.length+' jobs in “'+esc(wb.SheetNames[0])+'”. They will be added to your '+jobs.length+' jobs. Dates like 31/12/2026 are read as day/month/year.</p>',[{l:'Cancel'},{l:'Add to my jobs',c:'go',f:function(){out.forEach(function(j){jobs.push(j)});persist();tab='all';render()}}])}
+  catch(e){dlg('Can’t read file','You need to be online to import Excel files. CSV and Excel (.xlsx) files both work.',[{l:'OK'}])}}
+$('q').oninput=function(){qs=this.value;render()};
+$('xlf').onchange=function(e){var f=e.target.files[0];e.target.value='';if(f)importSheet(f)};
+$('list').addEventListener('change',function(e){if(e.target.id==='cyr'){cyr=e.target.value;render()}if(e.target.id==='ccur'){ccur=e.target.value;render()}});
 function backup(x){
   if(x==='lists'){openLists();return}if(x==='theme'){openTheme();return}
-  if(x==='imp'){$('impf').click();return}
+  if(x==='imp'){$('impf').click();return}if(x==='imx'){$('xlf').click();return}
   var st=iso(today());
   if(x==='json'){saveFile('hustle-backup-'+st+'.json',JSON.stringify(jobs));return}
   var H=['Job','Company','Payout method','Bank','PayPal account','Job email','Currency','Amount','Start date','Expected pay date','Status','Date received','Gift card','Gift card date','Taxable','Tax year','Tax status','Date submitted','Date completed','Expenses total','Notes','Struck out reason'];
   var R=jobs.map(function(j){return [j.name,j.company,j.method,j.bank,j.pp,j.mail,j.cur,j.gross,j.start,j.exp,eff(j),j.recv,j.gc,j.gcd,j.tax?'Yes':'No',j.tax?ty(j):'',j.tax?tx(j).st:'',j.tax?tx(j).sub:'',j.tax?tx(j).done:'',j.tax?exTot(j):'',j.notes,j.void?j.voidWhy:'']});
+  if(x==='xlsx'){exportXlsx(H,R,st);return}
   var csv=[H].concat(R).map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"'}).join(',')}).join('\r\n');
   saveFile('hustle-jobs-'+st+'.csv',csv);
 }
