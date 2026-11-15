@@ -130,7 +130,7 @@ try{jobs=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){jobs=[]}
 var FB=null,AUTH=null,FS=null,UID=null,dbReady=false,dbT=null,lastJ={},lastM='',unsubJ=null,unsubM=null;
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(jobs))}catch(e){}dbQueue()}
 function dbQueue(){if(!dbReady)return;clearTimeout(dbT);dbT=setTimeout(dbSave,600)}
-function setSync(t,mode){var e=$('sync');if(e)e.innerHTML=esc(t)+(mode==='in'?' <button class="b go" id="signin">Sign in with Google</button>':mode==='out'?' <button class="b" id="signout">Sign out</button>':'')}
+function setSync(t,mode){var e=$('sync');if(e)e.innerHTML=esc(t)+(mode?' ('+jobs.length+' records)':'')+(mode==='in'?' <button class="b go" id="signin">Sign in with Google</button>':mode==='out'?' <button class="b" id="signout">Sign out</button>':'')}
 function uref(){return FS.collection('users').doc(UID)}
 async function dbSave(){
   dbT=null;if(!dbReady)return;
@@ -219,14 +219,16 @@ function render(){
   L.forEach(function(j){var m=eff(j)==='Paid'?got:owed;m[j.cur]=(m[j.cur]||0)+net(j)});
   function lines(m){var k=Object.keys(m);return k.length?k.map(function(c){return money(m[c],c)}).join('<br>'):'Nothing'}
   $('cochip').innerHTML=co==='all'?'':'<div class="chip">'+esc(co)+'<button class="b" id="clr">Show all</button></div>';
-  $('sum').innerHTML='<div class="box"><small>Still to receive</small><b>'+lines(owed)+'</b></div><div class="box"><small>Received</small><b>'+lines(got)+'</b></div>';
-  var over=L.filter(function(j){return eff(j)==='Overdue'}).length;
+  var allT={};Object.keys(owed).concat(Object.keys(got)).forEach(function(c){allT[c]=(owed[c]||0)+(got[c]||0)});
+  $('sum').innerHTML='<div class="box"><small>Still to receive</small><b>'+lines(owed)+'</b></div><div class="box"><small>Received</small><b>'+lines(got)+'</b></div><div class="box" style="grid-column:1/-1"><small>All time total (received + still to receive)</small><b>'+lines(allT)+'</b></div>';
+  var LA=L.filter(function(j){return !isDone(j)}),DN=L.filter(isDone);
+  var over=LA.filter(function(j){return eff(j)==='Overdue'}).length;
   var taxN=L.filter(function(j){return j.tax}).length;
   var gcN=L.filter(function(j){return j.method==='Gift Card'&&j.gc==='Not Claimed'}).length;
-  var stN=jobs.filter(function(j){return j.void&&mine(j)}).length;var EX=jobs.filter(function(j){return j.kind==='expense'&&yrOK(j)});var RM=jobs.filter(function(j){return !j.void&&(j.rm||j.fg)});
-  var defs=[['all','All ('+L.length+')'],['over','Overdue ('+over+')'],['tax','Tax ('+taxN+')'],['gift','Gift card vault ('+gcN+')'],['rem','Reminders ('+RM.length+')'],['exp','Expenses ('+EX.length+')'],['struck','Struck out ('+stN+')']];
+  var stN=jobs.filter(function(j){return j.void&&mine(j)}).length;var EX=jobs.filter(function(j){return j.kind==='expense'&&yrOK(j)});var RM=jobs.filter(function(j){return !j.void&&j.kind!=='expense'&&!isDone(j)&&(j.rm||j.fg)||(j.kind==='expense'&&(j.rm||j.fg))});
+  var defs=[['all','All ('+LA.length+')'],['done','Completed ('+DN.length+')'],['over','Overdue ('+over+')'],['tax','Tax ('+taxN+')'],['gift','Gift card vault ('+gcN+')'],['rem','Reminders ('+RM.length+')'],['exp','Expenses ('+EX.length+')'],['struck','Struck out ('+stN+')']];
   $('tabs').innerHTML=defs.map(function(d){return '<button data-t="'+d[0]+'" class="'+(tab===d[0]?'on':'')+'">'+d[1]+'</button>'}).join('');
-  var f=tab==='struck'?jobs.filter(function(j){return j.void&&mine(j)}):L.slice();
+  var f=tab==='struck'?jobs.filter(function(j){return j.void&&mine(j)}):(tab==='done'?DN.slice():(tab==='all'||tab==='over')?LA.slice():L.slice());
   if(tab==='exp')f=EX.slice();if(tab==='rem')f=RM.slice();
   if(tab==='over')f=f.filter(function(j){return eff(j)==='Overdue'});
   if(tab==='tax'){f=f.filter(function(j){return j.tax});if(yr!=='all')f=f.filter(function(j){return ty(j)===yr});if(ts!=='all')f=f.filter(function(j){return tx(j).st===ts})}
@@ -239,6 +241,7 @@ function render(){
     Object.keys(inc).concat(Object.keys(exs)).forEach(function(c){pr[c]=(inc[c]||0)-(exs[c]||0)});
     var toR=f.filter(function(j){return eff(j)==='Paid'&&tx(j).st==='To report'}).length;
     b='Taxable jobs by UK tax year (6 Apr to 5 Apr).<br><select id="yr"><option value="all">All tax years</option>'+ys.map(function(y){return '<option'+(y===yr?' selected':'')+'>'+y+'</option>'}).join('')+'</select> <select id="ts">'+['all','To report','Submitted','Completed'].map(function(x){return '<option value="'+x+'"'+(x===ts?' selected':'')+'>'+(x==='all'?'All statuses':x)+'</option>'}).join('')+'</select><br><b>Income (paid):</b> '+lines(inc)+'<br><b>Unpaid taxable payments:</b> '+lines(unp)+'<br><b>Expenses:</b> '+lines(exs)+'<br><b>Profit:</b> '+lines(pr)+'<br>'+(toR?'<b>'+toR+' paid job'+(toR>1?'s':'')+' still to report.</b><br>':'')+'<a href="https://www.gov.uk/log-in-file-self-assessment-tax-return" target="_blank" rel="noopener">Open HMRC Self Assessment</a>'}
+  if(tab==='done'){var dg={},dow={};DN.forEach(function(j){var m=eff(j)==='Paid'?dg:dow;m[j.cur]=(m[j.cur]||0)+net(j)});b='Finished jobs, kept as your record and still counted in the totals at the top.<br><b>Received:</b> '+lines(dg)+'<br><b>Not paid yet:</b> '+lines(dow)}
   if(tab==='rem')b='Items with your own reminder date or flag. Overdue reminders show in red.';
   if(tab==='exp'){var et={};EX.forEach(function(j){et[j.cur]=(et[j.cur]||0)+net(j)});b='Money you spent on the side hustle. Tax expenses are taken off your profit in the Tax tab.<br><b>Total spent:</b> '+lines(et)}
   if(tab==='gift')b='Gift cards you still haven’t claimed or used.';
@@ -247,6 +250,7 @@ function render(){
   $('banner').innerHTML=b?'<div class="banner">'+b+'</div>':'';
   $('list').innerHTML=f.length?f.map(card).join(''):'<div class="empty">'+(jobs.length?'Nothing here.':'No jobs yet. Tap “Add job” to log your first payment.')+'</div>';
 }
+function isDone(j){return !!j.done||/^completed$/i.test(j.lb||'')}
 function card(j){if(j.kind==='expense')return expCard(j);
   var e=eff(j),d=due(j);
   var h='<div class="job '+e+'"><div class="top"><div><div class="name">'+esc(j.name)+'</div><div class="co">'+esc(j.company)+' · '+esc(j.method)+'</div></div>';
@@ -259,7 +263,7 @@ function card(j){if(j.kind==='expense')return expCard(j);
   if(j.pp)h+='<span class="tag">PayPal: '+esc(j.pp)+'</span>';
   if(j.mail)h+='<span class="tag">Job email: '+esc(j.mail)+'</span>';
   if(j.tax){var t=tx(j);h+='<span class="tag tax">Taxable '+ty(j)+'</span><span class="tag">Tax: '+t.st+(t.st!=='To report'&&(t.done||t.sub)?' '+fmt(pd(t.done||t.sub)):'')+'</span>';if(t.exp.length)h+='<span class="tag">Expenses '+money(exTot(j),j.cur)+'</span>';if(t.docs.length)h+='<span class="tag">'+t.docs.length+(t.docs.length>1?' docs':' doc')+'</span>'}
-  h+=flagTags(j);if(j.method==='Gift Card')h+='<span class="tag">Card: '+esc(j.gc)+(j.gc==='Claimed'&&j.gcd?' '+fmt(pd(j.gcd)):'')+'</span>';
+  h+=flagTags(j);if(j.done&&!/^completed$/i.test(j.lb||''))h+='<span class="tag" style="background:#1e8e3e;color:#fff">\u2713 Completed</span>';if(j.method==='Gift Card')h+='<span class="tag">Card: '+esc(j.gc)+(j.gc==='Claimed'&&j.gcd?' '+fmt(pd(j.gcd)):'')+'</span>';
   h+='</div>';
   if(j.void)h+='<div class="note"><b>Struck out '+fmt(pd(j.voidAt))+':</b> '+esc(j.voidWhy)+'</div>';
   if(j.notes)h+='<div class="note">'+esc(j.notes)+'</div>';
@@ -269,6 +273,7 @@ function card(j){if(j.kind==='expense')return expCard(j);
     if(j.status!=='Paid')h+='<button class="b go" data-a="paid" data-id="'+j.id+'">Mark paid</button>';
     else h+='<button class="b" data-a="unpaid" data-id="'+j.id+'">Mark unpaid</button>';
     if(j.method==='Gift Card'&&j.gc==='Not Claimed')h+='<button class="b" data-a="claim" data-id="'+j.id+'">Mark claimed</button>';
+    h+=isDone(j)?'<button class="b" data-a="reopen" data-id="'+j.id+'">Reopen</button>':'<button class="b" data-a="done" data-id="'+j.id+'">Mark completed</button>';
     if(j.tax)h+='<button class="b" data-a="tax" data-id="'+j.id+'">Tax details</button>';
     h+='<button class="b" data-a="edit" data-id="'+j.id+'">Edit</button>';
   }
@@ -311,6 +316,8 @@ $('list').onclick=function(e){
   else if(a==='restore'){delete j.void;persist();render()}
   else if(a==='del'){if(j.kind==='expense')dlg('Delete expense?','<p>'+esc(j.name)+' · '+money(net(j),j.cur)+'</p>',[{l:'Cancel'},{l:'Delete forever',c:'danger',f:function(){jobs=jobs.filter(function(x){return x.id!==j.id});persist();render()}}]);else askDelete(j)}
   else if(a==='edit'){if(j.kind==='expense')openExp(j);else openForm(j)}
+  else if(a==='done'){j.done=true;if(!j.lb)j.lb='Completed';if(!j.fg)j.fg='green';persist();render()}
+  else if(a==='reopen'){j.done=false;if(/^completed$/i.test(j.lb||'')){j.lb='';if(j.fg==='green')j.fg=''}persist();render()}
   else if(a==='tax')openTax(j);
 };
 $('tabs').onclick=function(e){var t=e.target.getAttribute('data-t');if(t){tab=t;render()}};
