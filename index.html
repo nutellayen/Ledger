@@ -236,7 +236,8 @@ function render(){
   if(tab==='tax'){f=f.filter(function(j){return j.tax});if(yr!=='all')f=f.filter(function(j){return ty(j)===yr});if(ts!=='all')f=f.filter(function(j){return tx(j).st===ts})}
   if(tab==='gift')f=f.filter(function(j){return j.method==='Gift Card'&&j.gc==='Not Claimed'});
   var order={Overdue:0,Pending:1,Unpaid:2,Paid:3,Void:4};
-  f.sort(function(a,b){var d=order[eff(a)]-order[eff(b)];if(d)return d;var x=due(a),y=due(b);return (x?x.getTime():9e15)-(y?y.getTime():9e15)});
+  var lastD=function(j){var v=j.recv||j.exp||j.start||'';return v};
+  f.sort(function(a,b){var x=lastD(a),y=lastD(b);return x<y?1:x>y?-1:0});
   var b='';if(tab==='exp')f.sort(function(a,c){return (c.start||'')<(a.start||'')?-1:1});if(tab==='rem')f.sort(function(a,c){return (a.rm||'9999')<(c.rm||'9999')?-1:1});
   if(tab==='tax'){var ys=[],inc={},exs={},pr={};var cy=today().getFullYear();if(today()<new Date(cy,3,6))cy--;['2024-2025','2025-2026','2026-2027','2027-2028'].forEach(function(s){if(ys.indexOf(s)<0)ys.push(s)});L.concat(EX).forEach(function(j){if(j.tax&&ty(j)&&ys.indexOf(ty(j))<0)ys.push(ty(j))});ys.sort();var unp={};
     f.forEach(function(j){if(eff(j)==='Paid')inc[j.cur]=(inc[j.cur]||0)+net(j);else unp[j.cur]=(unp[j.cur]||0)+net(j);exs[j.cur]=(exs[j.cur]||0)+exTot(j)});EX.forEach(function(j){if(j.tax&&(yr==='all'||ty(j)===yr))exs[j.cur]=(exs[j.cur]||0)+net(j)});
@@ -256,38 +257,39 @@ function render(){
     var sp={},su={};f.forEach(function(j){if(j.void||j.kind==='expense')return;var m=eff(j)==='Paid'?sp:su;m[j.cur]=(m[j.cur]||0)+net(j)});
     b='<b>'+f.length+' result'+(f.length===1?'':'s')+'</b> for “'+esc(qs)+'” across all records (every tab, completed and struck out too).<br><b>Received:</b> '+lines(sp)+'<br><b>Not paid yet:</b> '+lines(su)}
   $('banner').innerHTML=b?'<div class="banner">'+b+'</div>':'';
+  if(tab==='done'&&f.length){$('list').innerHTML='<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px 10px">'+f.map(doneRow).join('')+'</div>';return}
   $('list').innerHTML=f.length?f.map(card).join(''):'<div class="empty">'+(jobs.length?'Nothing here.':'No jobs yet. Tap “Add job” to log your first payment.')+'</div>';
 }
 function isDone(j){return !!j.done||/^completed$/i.test(j.lb||'')}
+function briefOf(j){var t=(j.notes||'').replace(/\[Status assumed[^\]]*\]/g,'').replace(/\s+/g,' ').trim();return t.length>110?t.slice(0,110)+'…':t}
 function card(j){if(j.kind==='expense')return expCard(j);
-  var e=eff(j),d=due(j);
-  var h='<div class="job '+e+'"><div class="top"><div><div class="name">'+esc(j.name)+'</div><div class="co">'+esc(j.company)+' · '+esc(j.method)+'</div></div>';
-  h+='<div class="amt">'+money(net(j),j.cur)+'</div></div><div class="tags">';
+  var e=eff(j),d=due(j),st=j.start?fmt(pd(j.start)):'';
+  var h='<div class="job '+e+'" style="padding:9px 12px;margin-bottom:8px;border-radius:12px"><div class="top"><div style="min-width:0"><div class="name" style="font-size:15px;line-height:1.25">'+esc(j.name)+'</div><div class="co" style="font-size:12px">'+esc(j.company)+' · '+esc(j.method)+(st?' · started '+st:'')+'</div></div>';
+  h+='<div class="amt" style="font-size:15px;white-space:nowrap">'+money(net(j),j.cur)+'</div></div><div class="tags" style="margin-top:5px;gap:4px">';
   if(e==='Overdue'){var n=Math.round((today()-d)/864e5);h+='<span class="tag Overdue">Overdue '+n+(n===1?' day':' days')+'</span>'}
   else if(e!=='Void')h+='<span class="tag '+e+'">'+e+'</span>';
   if(d&&e!=='Paid'&&e!=='Void')h+='<span class="tag">Expected '+fmt(d)+'</span>';
   if(e==='Paid'&&j.recv)h+='<span class="tag">Received '+fmt(pd(j.recv))+'</span>';
-  if(j.bank)h+='<span class="tag">'+esc(j.bank)+'</span>';
-  if(j.pp)h+='<span class="tag">PayPal: '+esc(j.pp)+'</span>';
-  if(j.mail)h+='<span class="tag">Job email: '+esc(j.mail)+'</span>';
-  if(j.tax){var t=tx(j);h+='<span class="tag tax">Taxable '+ty(j)+'</span><span class="tag">Tax: '+t.st+(t.st!=='To report'&&(t.done||t.sub)?' '+fmt(pd(t.done||t.sub)):'')+'</span>';if(t.exp.length)h+='<span class="tag">Expenses '+money(exTot(j),j.cur)+'</span>';if(t.docs.length)h+='<span class="tag">'+t.docs.length+(t.docs.length>1?' docs':' doc')+'</span>'}
-  h+=flagTags(j);if(j.done&&!/^completed$/i.test(j.lb||''))h+='<span class="tag" style="background:#1e8e3e;color:#fff">\u2713 Completed</span>';if(j.method==='Gift Card')h+='<span class="tag">Card: '+esc(j.gc)+(j.gc==='Claimed'&&j.gcd?' '+fmt(pd(j.gcd)):'')+'</span>';
+  if(j.tax)h+='<span class="tag tax">Taxable '+ty(j)+'</span>';
+  if(j.method==='Gift Card')h+='<span class="tag">Card: '+esc(j.gc)+'</span>';
+  h+=flagTags(j);if(j.done&&!/^completed$/i.test(j.lb||''))h+='<span class="tag" style="background:#1e8e3e;color:#fff">✓ Completed</span>';
   h+='</div>';
-  if(j.void)h+='<div class="note"><b>Struck out '+fmt(pd(j.voidAt))+':</b> '+esc(j.voidWhy)+'</div>';
-  if(j.notes)h+='<div class="note">'+esc(j.notes)+'</div>';
-  h+='<div class="acts">';
+  if(j.void)h+='<div class="note" style="font-size:12px"><b>Struck out:</b> '+esc(j.voidWhy)+'</div>';
+  var br=briefOf(j);if(br)h+='<div class="note" style="font-size:12px;margin:4px 0 0">'+esc(br)+'</div>';
+  h+='<div class="acts" style="margin-top:6px;gap:6px">';
   if(j.void)h+='<button class="b" data-a="restore" data-id="'+j.id+'">Restore</button>';
   else{
+    if(isDone(j))h+='<button class="b" data-a="reopen" data-id="'+j.id+'">Reopen</button>';
     if(j.status!=='Paid')h+='<button class="b go" data-a="paid" data-id="'+j.id+'">Mark paid</button>';
     else h+='<button class="b" data-a="unpaid" data-id="'+j.id+'">Mark unpaid</button>';
     if(j.method==='Gift Card'&&j.gc==='Not Claimed')h+='<button class="b" data-a="claim" data-id="'+j.id+'">Mark claimed</button>';
-    h+=isDone(j)?'<button class="b" data-a="reopen" data-id="'+j.id+'">Reopen</button>':'<button class="b" data-a="done" data-id="'+j.id+'">Mark completed</button>';
-    if(j.tax)h+='<button class="b" data-a="tax" data-id="'+j.id+'">Tax details</button>';
+    if(j.tax)h+='<button class="b" data-a="tax" data-id="'+j.id+'">Tax</button>';
     h+='<button class="b" data-a="edit" data-id="'+j.id+'">Edit</button>';
   }
   h+='<button class="b" data-a="del" data-id="'+j.id+'">Delete</button></div></div>';
   return h;
 }
+function doneRow(j){var dt=j.recv||j.start;return '<div data-a="edit" data-id="'+j.id+'" style="display:flex;gap:8px;align-items:baseline;padding:6px 4px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer"><span style="width:62px;color:var(--mute);flex:none">'+(dt?fmt(pd(dt)):'')+'</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(j.name)+' <span style="color:var(--mute)">· '+esc(j.company)+'</span></span><span style="flex:none;white-space:nowrap;font-weight:600">'+money(net(j),j.cur)+'</span></div>'}
 var FC={red:'#d93025',amber:'#e37400',green:'#1e8e3e',blue:'#1a73e8',purple:'#8e24aa'};
 function flagTags(j){var h='';
   if(j.fg&&FC[j.fg])h+='<span class="tag" style="background:'+FC[j.fg]+';color:#fff">\u2691 '+(j.lb?esc(j.lb):esc(j.fg))+'</span>';
@@ -316,7 +318,7 @@ function askDelete(j){
   [{l:'Cancel'}].concat(strike?[{l:'Strike out',f:function(){var w=$('why').value.trim();if(!w){$('why').focus();return false}j.void=true;j.voidWhy=w;j.voidAt=iso(today());persist();render()}}]:[]).concat([{l:'Delete forever',c:'danger',f:function(){var w=$('why').value.trim();if(!w){$('why').focus();return false}jobs=jobs.filter(function(x){return x.id!==j.id});persist();render()}}]));
 }
 $('list').onclick=function(e){
-  var a=e.target.getAttribute('data-a'),id=e.target.getAttribute('data-id');if(!a)return;
+  var tg=e.target.closest?e.target.closest('[data-a]'):e.target;var a=tg&&tg.getAttribute('data-a'),id=tg&&tg.getAttribute('data-id');if(!a)return;
   var j=find(id);if(!j)return;
   if(a==='paid')askDate('Mark as paid','Date you received it',function(v){j.status='Paid';j.recv=v});
   else if(a==='unpaid'){j.status='Unpaid';j.recv='';persist();render()}
@@ -396,9 +398,11 @@ $('save').onclick=function(){
   if(j.method!=='Bank Transfer')j.bank='';if(j.method!=='PayPal')j.pp='';
   if(j.status==='Paid'&&!j.recv)j.recv=iso(today());
   if(!editId)jobs.push(j);
-  persist();$('modal').classList.remove('open');render();
+  var wasDone=isDone(j);persist();$('modal').classList.remove('open');render();
+  if(!wasDone&&!j.void&&j.kind!=='expense')dlg('Mark as completed?','<p>Do you want to mark “'+esc(j.name)+'” as completed? It will move to the Completed tab. It stays in your totals.</p>',[{l:'No'},{l:'Yes',c:'go',f:function(){j.done=true;if(!j.lb)j.lb='Completed';if(!j.fg)j.fg='green';persist();render()}}]);
 };
 async function saveFile(name,text){var d=null;try{if(window.claude)d=await claude.use('downloads')}catch(e){}
+  try{var isc0=/\.csv$/i.test(name);var f0=new File([isc0?'\ufeff'+text:text],name,{type:isc0?'text/csv':'application/json'});if(navigator.canShare&&navigator.canShare({files:[f0]})){await navigator.share({files:[f0],title:name});return}}catch(e){if(e&&e.name==='AbortError')return}
   if(d){try{await d.save({filename:name,data:text});return}catch(e){if(e&&e.code==='declined')return}}
   try{var isc=/\.csv$/i.test(name);var bb=new Blob([isc?'\ufeff'+text:text],{type:isc?'text/csv;charset=utf-8':'application/json'});var aa=document.createElement('a');aa.href=URL.createObjectURL(bb);aa.download=name;document.body.appendChild(aa);aa.click();aa.remove();setTimeout(function(){URL.revokeObjectURL(aa.href)},4000);return}catch(e){}
   dlg('Copy this text','<textarea id="cp" rows="8" readonly></textarea><p class="note">Select all, copy, then paste it into a note or an email to yourself.</p>',[{l:'Close'}]);$('cp').value=text;
