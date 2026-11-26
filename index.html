@@ -26,7 +26,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-app
 .hd{display:flex;align-items:center;gap:10px;margin:6px 0 14px}
 h1{font:700 26px/1.1 Georgia,"Times New Roman",serif;margin:0}
 .chip{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--acc);color:var(--bg);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-weight:600}
-.sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .box small{color:var(--mute);display:block}
 .box b{font-size:18px;display:block;margin-top:2px}
@@ -222,7 +222,10 @@ function render(){
   function lines(m){var k=Object.keys(m);return k.length?k.map(function(c){return money(m[c],c)}).join('<br>'):'Nothing'}
   $('cochip').innerHTML=co==='all'?'':'<div class="chip">'+esc(co)+'<button class="b" id="clr">Show all</button></div>';
   var allT={};Object.keys(owed).concat(Object.keys(got)).forEach(function(c){allT[c]=(owed[c]||0)+(got[c]||0)});
-  $('sum').innerHTML='<div class="box"><small>Still to receive</small><b>'+lines(owed)+'</b></div><div class="box"><small>Received</small><b>'+lines(got)+'</b></div><div class="box" style="grid-column:1/-1"><small>All time total (received + still to receive)</small><b>'+lines(allT)+'</b></div>';
+  var sumHtml='<div class="box"><small>Still to receive</small><b>'+lines(owed)+'</b></div><div class="box"><small>Received</small><b>'+lines(got)+'</b></div><div class="box" style="grid-column:1/-1"><small>All time total (received + still to receive)</small><b>'+lines(allT)+'</b></div>';
+  var one=function(m){var k=Object.keys(m);return k.length?k.map(function(c){return money(m[c],c)}).join(' · '):'nothing'};
+  $('sum').innerHTML='<button class="b" id="sumtog" style="width:100%;text-align:left;display:flex;justify-content:space-between;gap:8px;padding:8px 12px;font-size:13px"><span><b>Totals</b> <span style="color:var(--mute)">received '+one(got)+' · to receive '+one(owed)+'</span></span><span>'+(sumOpen?'▴':'▾')+'</span></button>'+(sumOpen?'<div class="sum" style="margin:8px 0 0;gap:8px">'+sumHtml.replace(/<b>/g,'<b style="font-size:15px">')+'</div>':'');
+  $('sumtog').onclick=function(){sumOpen=!sumOpen;render()};
   var LA=L.filter(function(j){return !isDone(j)}),DN=L.filter(isDone);
   var over=LA.filter(function(j){return eff(j)==='Overdue'}).length;
   var taxN=L.filter(function(j){return j.tax}).length;
@@ -407,7 +410,7 @@ async function saveFile(name,text){var d=null;try{if(window.claude)d=await claud
   try{var isc=/\.csv$/i.test(name);var bb=new Blob([isc?'\ufeff'+text:text],{type:isc?'text/csv;charset=utf-8':'application/json'});var aa=document.createElement('a');aa.href=URL.createObjectURL(bb);aa.download=name;document.body.appendChild(aa);aa.click();aa.remove();setTimeout(function(){URL.revokeObjectURL(aa.href)},4000);return}catch(e){}
   dlg('Copy this text','<textarea id="cp" rows="8" readonly></textarea><p class="note">Select all, copy, then paste it into a note or an email to yourself.</p>',[{l:'Close'}]);$('cp').value=text;
 }
-var cyr=null,ccur=null,qs='';
+var cyr=null,ccur=null,qs='',sumOpen=false;
 function curTY(){var d=today(),y=d.getFullYear();if(d<new Date(y,3,6))y--;return y+'-'+(y+1)}
 function chartHTML(){
   if(!cyr)cyr=curTY();
